@@ -1,0 +1,5 @@
+{
+    "python.pythonPath": "/Users/voronik/Desktop/course work/env/bin/python",
+    "python.linting.pylintEnabled": true,
+    "python.linting.enabled": true
+}
