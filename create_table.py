@@ -1,38 +1,42 @@
 import psycopg2
-import os
-import logging, logging.config
-import yaml
-from datetime import datetime
 import random
-import json
-from pygtail import Pygtail
-import pythonjsonlogger
+from datetime import datetime
 
-from read_logs import is_stopped
-
-product = ['Iphone', 'Tablet', 'Phone', 'Air Max', 'Sneakers', 'Polo', 'Nikes']
+url = {
+    'Ozon' : 'https://www.ozon.ru/',
+    'Computeruniverse' : 'https://www.computeruniverse.net/ru',
+    'Asos' : 'https://www.asos.com',
+    'Madshop' : 'https://www.madshop.com',
+    'Amazon' : 'https://www.amazon.com',
+    'Avito' : 'https://www.avito.ru',
+    'Basketshop' : 'https://www.basketshop.com',
+    'Brandshop' : 'https://www.brandshop.com',
+    'Sneakerhead' : 'https://www.sneakerhead.com',
+    'Traektoria' : 'https://www.traektoria.com',
+    'Oktyabr' : 'https://www.oktyabr.com',
+    'Slamdunk' : 'https://www.slamdunk.com',
+    'Destroy' : 'https://www.destroy.com',
+    'Tsum' : 'https://www.tsum.com',
+}
 message = [
-    f'RockStart-{random.choice(product)}', 
-    f'Fast-{random.choice(product)}', 
-    f'Ozon-{random.choice(product)}', 
-    f'Amazon-{random.choice(product)}', 
-    f'Computeruniverse-{random.choice(product)}', 
-    f'Brandshop-{random.choice(product)}', 
-    f'Asos-{random.choice(product)}', 
-    f'Mega-{random.choice(product)}', 
-    f'Avito-{random.choice(product)}',
-    f'Apple-{random.choice(product)}', 
-    f'Lamoda-{random.choice(product)}', 
-    f'Slamdunk-{random.choice(product)}', 
-    f'Basketshop-{random.choice(product)}', 
-    f'Oktyabr-{random.choice(product)}', 
-    f'Traektoria-{random.choice(product)}', 
-    f'Sneakerhead-{random.choice(product)}', 
-    f'Qwintry-{random.choice(product)}',
- ]
+    'Ozon',
+    'Computeruniverse',
+    'Asos',
+    'Madshop',
+    'Amazon',
+    'Avito',
+    'Basketshop',
+    'Brandshop',
+    'Sneakerhead',
+    'Traektoria',
+    'Oktyabr',
+    'Slamdunk',
+    'Destroy',
+    'Tsum'
+]
 
+# программа инициализации данных
 def start_database_process(connection):
-    
     cursor = connection.cursor()
     """ create tables in the PostgreSQL database"""
     commands = (
@@ -40,6 +44,7 @@ def start_database_process(connection):
         CREATE TABLE vendors1 (
             vendor_id serial primary key,
             vendor_name varchar(255) NOT NULL,
+            url varchar(255) NOT NULL,
             mode varchar(255) NOT NULL,
             old_name varchar(255),
             event_time timestamp without time zone NOT NULL
@@ -48,6 +53,7 @@ def start_database_process(connection):
         """ CREATE TABLE vendors2 (
             vendor_id serial primary key,
             vendor_name varchar(255) NOT NULL,
+            url varchar(255) NOT NULL,
             mode varchar(255) NOT NULL,
             old_name varchar(255),
             event_time timestamp without time zone NOT NULL
@@ -57,6 +63,7 @@ def start_database_process(connection):
         CREATE TABLE vendors3 (
             vendor_id serial primary key,
             vendor_name varchar(255) NOT NULL,
+            url varchar(255) NOT NULL,
             mode varchar(255) NOT NULL,
             old_name varchar(255),
             event_time timestamp without time zone NOT NULL
@@ -80,7 +87,7 @@ def start_database_process(connection):
         connection.commit()
     except (Exception, psycopg2.DatabaseError) as error:
         print(error)
-
+        connection.rollback()
 
 class Replication():
     def __init__(self):
@@ -90,8 +97,8 @@ class Replication():
                             host="students.ami.nstu.ru",
                             port="5432",
                             options="-c search_path={0},public".format("pmib8502"))
-        self.log_id = 6
-        self.trans_time = 6
+        self.log_id = 0
+        self.trans_time = 0
         self.count_for_start = 6
         self.begin = False
     
@@ -152,13 +159,13 @@ class Replication():
 
     def insert_value(self, table_name):
         sql = f"""INSERT INTO {table_name}
-                VALUES(%s,%s,%s,%s,%s);"""
-        id = self.next_val(table_name, 'vendor_id')
+                VALUES(%s,%s,%s,%s,%s,%s);"""
+        id = self.choose_max_oid(table_name) + 1
         old = 'NULL'
         try:
             cursor = self.connection.cursor()
             mes = random.choice(message)
-            cursor.execute(sql, (id, mes, 'INSERT', old, datetime.now()))
+            cursor.execute(sql, (id, mes, url[mes], 'INSERT', old, datetime.now()))
             self.connection.commit()
             self.trans_time += 1
             self.add_log(table_name, datetime.now(), 'INSERT', None, mes, id)
@@ -169,13 +176,13 @@ class Replication():
 
     def update_value(self, table_name):
         sql = f""" UPDATE {table_name}
-                    SET vendor_name = %s, mode = %s, old_name = %s, event_time = %s
+                    SET vendor_name = %s, url= %s, mode = %s, old_name = %s, event_time = %s
                     WHERE vendor_id = %s"""
         updated_rows = 0
         id = self.choose_min_oid(table_name)
         mes = random.choice(message)
         old = self.get_old_value(table_name, id)
-        vendor_info = (mes, 'UPDATE', old, datetime.now(), id)
+        vendor_info = (mes, url[mes], 'UPDATE', old, datetime.now(), id)
         try:
             cur = self.connection.cursor()
             cur.execute(sql,vendor_info)
@@ -249,9 +256,6 @@ class Replication():
             if log[6] not in id_result:
                 result.append(log)
                 id_result.append(log[6])
-            else:
-                if log[3] != 'UPDATE':
-                    result.append(log)
         if len(result) != len(logs):
             print('Возникла коллизия. Коллизия ращрешена в пользу последнего обновления.')
         return result
@@ -265,21 +269,22 @@ class Replication():
                 result = self.replication()
                 result = self.decide_collision(result)
                 for r in result:
+                    print(r[0], '\t', r[1], '\t', r[2], '\t',r[3], '\t',r[4], '\t',r[5], '\t',r[6])
+                for r in result:
                     self.copy(r)
                 self.log_id = self.trans_time
         except Exception:
             self.connection.rollback()
             raise Exception
-
             
     
     def replication_insert(self, table_name, id_record, mes, old, time):
         sql = f"""INSERT INTO {table_name}
-                VALUES(%s,%s,%s,%s,%s);"""
-        id_record = self.next_val(table_name, 'vendor_id')
+                VALUES(%s,%s,%s,%s,%s,%s);"""
+        # id_record = self.next_val(table_name, 'vendor_id')
         try:
             cursor = self.connection.cursor()
-            cursor.execute(sql, (id_record, mes, 'INSERT', old, time))
+            cursor.execute(sql, (id_record, mes, url[mes], 'INSERT', old, time))
             self.connection.commit()
             cursor.close()
         except (Exception, psycopg2.DatabaseError) as error:
@@ -288,11 +293,11 @@ class Replication():
 
     def replication_update(self, table_name, id_record, mes, old, time):
         sql = f""" UPDATE {table_name}
-                    SET vendor_name = %s, mode = %s, old_name = %s, event_time = %s
+                    SET vendor_name = %s, url=%s, mode = %s, old_name = %s, event_time = %s
                     WHERE vendor_id = %s"""
         try:
             cursor = self.connection.cursor()
-            cursor.execute(sql, (mes, 'UPDATE', old, time, id_record))
+            cursor.execute(sql, (mes, url[mes], 'UPDATE', old, time, id_record))
             self.connection.commit()
             cursor.close()
         except (Exception, psycopg2.DatabaseError) as error:
@@ -357,9 +362,9 @@ class Replication():
 
 def main():
     rd = Replication()
-    # start_database_process(rd.connection)
-    # for _ in range(6):
-        # rd.insert_value('vendors1')
+    start_database_process(rd.connection)
+    for _ in range(6):
+        rd.insert_value('vendors1')
     while True:
         rd.start_replication()
 

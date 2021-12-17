@@ -1,0 +1,4 @@
+drop table vendors2;
+drop table vendors3;
+drop table vendors1;
+drop table log_table;
