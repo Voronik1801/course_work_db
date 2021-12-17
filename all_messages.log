@@ -1,2 +1,9 @@
-{table:vendors1, datetime:2021-12-15 17:12:28.683163, mode:DELETE, changing:5}
-{table:vendors1, datetime:2021-12-15 17:12:28.866107, mode:UPDATE, changing:(5, 'dfd')}
+{"message": "table:vendors2, mode:UPDATE, changing:None", "asctime": "2021-12-16 22:07:56,303"}
+{"message": "table:vendors3, mode:UPDATE, changing:\u041e\u0431\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u0435", "asctime": "2021-12-16 22:07:56,436"}
+{"message": "table:vendors1, mode:UPDATE, changing:\u041e\u0431\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u0435", "asctime": "2021-12-16 22:07:56,581"}
+{"message": "table:vendors3, mode:UPDATE, changing:\u041e\u0431\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u0435", "asctime": "2021-12-16 22:07:56,689"}
+{"message": "table:vendors3, mode:UPDATE, changing:\u041e\u0431\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u0435", "asctime": "2021-12-16 22:07:56,775"}
+{"message": "table:vendors1, mode:UPDATE, changing:\u041e\u0431\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u0435", "asctime": "2021-12-16 22:08:13,160"}
+{"message": "table:vendors1, mode:UPDATE, changing:5", "asctime": "2021-12-16 22:08:13,307"}
+{"message": "table:vendors1, mode:UPDATE, changing:\u041e\u0431\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u0435", "asctime": "2021-12-16 22:08:13,336"}
+{"message": "table:vendors2, mode:UPDATE, changing:\u041e\u0431\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u0435", "asctime": "2021-12-16 22:08:13,363"}
