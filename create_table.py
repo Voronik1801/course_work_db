@@ -48,7 +48,7 @@ def start_database_process(connection):
             mode varchar(255) NOT NULL,
             old_name varchar(255),
             event_time timestamp without time zone NOT NULL
-        )
+        )with oids
         """,
         """ CREATE TABLE vendors2 (
             vendor_id serial primary key,
@@ -57,7 +57,7 @@ def start_database_process(connection):
             mode varchar(255) NOT NULL,
             old_name varchar(255),
             event_time timestamp without time zone NOT NULL
-        )
+        )with oids
         """,
         """
         CREATE TABLE vendors3 (
@@ -67,7 +67,7 @@ def start_database_process(connection):
             mode varchar(255) NOT NULL,
             old_name varchar(255),
             event_time timestamp without time zone NOT NULL
-        )
+        )with oids
         """,
         """
         CREATE TABLE log_table (
@@ -78,7 +78,7 @@ def start_database_process(connection):
             old varchar(255),
             new varchar(255),
             change_id integer NOT NULL
-        )
+        )with oids
         """,)
     try:
         for command in commands:
@@ -88,6 +88,34 @@ def start_database_process(connection):
     except (Exception, psycopg2.DatabaseError) as error:
         print(error)
         connection.rollback()
+
+def start_input(connection, rd):
+    shops = [
+    'Ozon', 
+    'Amazon',
+    'Avito',
+    'Basketshop',
+    'Brandshop',
+    'Sneakerhead',
+    'Traektoria',
+    'Oktyabr',
+    'Slamdunk',]
+    tables = ['vendors1', 'vendors2', 'vendors3']
+    for table in tables:
+        for mes in shops:
+            sql = f"""INSERT INTO {table}
+                        VALUES(%s,%s,%s,%s,%s,%s);"""
+            id = rd.next_val(table, 'vendor_id')
+            old = 'NULL'
+            try:
+                cursor = connection.cursor()
+                cursor.execute(sql, (id, mes, url[mes], 'INITIAL INSERT', old, datetime.now()))
+                connection.commit()
+                cursor.close()
+            except (Exception, psycopg2.DatabaseError) as error:
+                print(error)
+                connection.rollback()
+
 
 class Replication():
     def __init__(self):
@@ -103,8 +131,8 @@ class Replication():
         self.begin = False
     
 
-    def choose_max_oid(self, table_name):
-        sql = f"""SELECT * from {table_name} order by 1 desc limit 1"""
+    def choose_max_id(self, table_name):
+        sql = f"""SELECT vendor_id from {table_name} where oid = (SELECT max(oid) from {table_name})"""
         try:
             cursor = self.connection.cursor()
             cursor.execute(sql)
@@ -118,8 +146,8 @@ class Replication():
             print(error)
             self.connection.rollback()
 
-    def choose_min_oid(self, table_name):
-        sql = f"""SELECT * from {table_name} order by 1 limit 1"""
+    def choose_min_id(self, table_name):
+        sql = f"""SELECT vendor_id from {table_name} where oid = (SELECT min(oid) from {table_name})"""
         try:
             cursor = self.connection.cursor()
             cursor.execute(sql)
@@ -160,7 +188,7 @@ class Replication():
     def insert_value(self, table_name):
         sql = f"""INSERT INTO {table_name}
                 VALUES(%s,%s,%s,%s,%s,%s);"""
-        id = self.choose_max_oid(table_name) + 1
+        id = self.next_val(table_name, 'vendor_id')
         old = 'NULL'
         try:
             cursor = self.connection.cursor()
@@ -177,12 +205,12 @@ class Replication():
     def update_value(self, table_name):
         sql = f""" UPDATE {table_name}
                     SET vendor_name = %s, url= %s, mode = %s, old_name = %s, event_time = %s
-                    WHERE vendor_id = %s"""
+                    WHERE oid = (SELECT min(oid) from {table_name})"""
         updated_rows = 0
-        id = self.choose_min_oid(table_name)
+        id = self.choose_min_id(table_name)
         mes = random.choice(message)
         old = self.get_old_value(table_name, id)
-        vendor_info = (mes, url[mes], 'UPDATE', old, datetime.now(), id)
+        vendor_info = (mes, url[mes], 'UPDATE', old, datetime.now())
         try:
             cur = self.connection.cursor()
             cur.execute(sql,vendor_info)
@@ -199,16 +227,16 @@ class Replication():
 
     def delete_value(self, table_name):
         """ delete part by part id """
-        part_id = self.choose_max_oid(table_name)
+        id = self.choose_max_id(table_name)
         rows_deleted = 0
-        old = self.get_old_value(table_name, part_id)
+        old = self.get_old_value(table_name, id)
         try:
             cur = self.connection.cursor()
-            cur.execute(f"DELETE FROM {table_name} WHERE vendor_id = %s", (part_id,))
+            cur.execute(f"DELETE FROM {table_name} WHERE oid = (SELECT max(oid) from {table_name})")
             rows_deleted = cur.rowcount
             self.connection.commit()
             self.trans_time += 1
-            self.add_log(table_name, datetime.now(), 'DELETE', old, None, part_id)
+            self.add_log(table_name, datetime.now(), 'DELETE', old, None, id)
             cur.close()
         except (Exception, psycopg2.DatabaseError) as error:
             print(error)
@@ -363,8 +391,7 @@ class Replication():
 def main():
     rd = Replication()
     start_database_process(rd.connection)
-    for _ in range(6):
-        rd.insert_value('vendors1')
+    start_input(rd.connection, rd)
     while True:
         rd.start_replication()
 
